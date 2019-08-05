@@ -102,7 +102,7 @@ data "archive_file" "lambda_post_processor" {
 data "archive_file" "lambda_graph" {
   type        = "zip"
   source_dir  = "lambdas/src/graph"
-  output_path = "lambads/dist/graph.zip"
+  output_path = "lambdas/dist/graph.zip"
 }
 
 resource "aws_s3_bucket_object" "lambda_init" {
