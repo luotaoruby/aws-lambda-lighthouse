@@ -34,7 +34,7 @@ resource "aws_dynamodb_table" "lighthouse_metrics_entries" {
 resource "aws_dynamodb_table" "lighthouse_metrics_jobs" {
   name             = "LighthouseMetricsJobs"
   billing_mode     = "PAY_PER_REQUEST"
-  has_key          = "JobId"
+  hash_key          = "JobId"
   attribute {
     name = "JobId"
     type = "S"
@@ -46,7 +46,7 @@ resource "aws_dynamodb_table" "lighthouse_metrics_jobs" {
 resource "aws_dynamodb_table" "lighthouse_metrics_runs" {
   name         = "LighthouseMetricsRuns"
   billing_mode = "PAY_PER_REQUEST"
-  has_key      = "RunId"
+  hash_key      = "RunId"
   global_secondary_index {
     name            = "JobIdIndex"
     hash_key        = "JobId"
@@ -80,6 +80,56 @@ resource "aws_sns_topic" "pages_to_test_dlq" {
   name = "lighthouse-pages-to-test-dlq"
 }
 
+# Archive file
+resource "archive_file" "lambda_init" {
+  type        = "zip"
+  source_dir  = "lambdas/src/init"
+  output_path = "lambdas/dist/init.zip"
+}
+
+resource "archive_file" "lambda_worker" {
+  type        = "zip"
+  source_dir  = "lambdas/src/worker"
+  output_path = "lambdas/dist/worker.zip"
+}
+
+resource "archive_file" "lambda_post_processor" {
+  type        = "zip"
+  source_dir  = "lambdas/src/post-processor"
+  output_path = "lambdas/dist/post-processor.zip"
+}
+
+resource "archive_file" "lambda_graph" {
+  type        = "zip"
+  source_dir  = "lambdas/src/graph"
+  output_path = "lambdas/dist/graph.zip"
+}
+
+resource "aws_s3_bucket_object" "lambda_init" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/init.zip"
+  source = "${data.archive_file.lambda_init.output_path}"
+  etag   = "${filemd5("lambdas/dist/init.zip")}"
+}
+
+resource "aws_s3_bucket_object" "lambda_worker" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/worker.zip"
+  source = "${data.archive_file.lambda_worker.output_path}"
+  etag   = "${filemd5("lambdas/dist/worker.zip")}"
+}
+resource "aws_s3_bucket_object" "lambda_post_processor" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/post-processor.zip"
+  source = "${data.archive_file.lambda_post_processor.output_path}"
+  etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
+}
+resource "aws_s3_bucket_object" "lambda_graph" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambads/v${local.app_version}/graph.zip"
+  source = "${data.archive_file.lambda_graph.output_path}"
+  etag   = "${filemd5("lambdas/dist/graph.zip")}"
+}
 
 resource "aws_iam_role" "lambda_graph" {
   name               = "lambda_graph"
@@ -120,6 +170,7 @@ resource "aws_iam_role_policy" "lambda_graph" {
   }
   EOF
 }
+
 resource "aws_lambda_function" "graph" {
   function_name = "lighthouse_graph"
   s3_bucket     = "${aws_s3_bucket.lighthouse_metrics.id}"
@@ -316,58 +367,6 @@ resource "aws_lambda_function" "worker" {
   }
 }
 
-resource "aws_s3_bucket_object" "lambda_init" {
-  bucket = "${aws_s3_bucket.lightouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/init.zip"
-  source = "${data.archive_file.lambda_init.output_path}"
-  etag   = "${filemd5("lambdas/dist/init.zip")}"
-}
-
-resource "aws_s3_bucket_object" "lambda_worker" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/worker.zip"
-  source = "${data.archive_file.lambda_worker.output_path}"
-  etag   = "${filemd5("lambdas/dist/worker.zip")}"
-}
-resource "aws_s3_bucket_object" "lambda_post_processor" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/post-processor.zip"
-  source = "${data.archive_file.lambda_post_processor.output_path}"
-  etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
-}
-resource "aws_s3_bucket_object" "lambda_graph" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambads/v${local.app_version}/graph.zip"
-  source = "${data.archive_file.lambda_graph.output_path}"
-  etag   = "${filemd5("lambdas/dist/graph.zip")}"
-}
-
-resource "aws_sns_topic_subscription" "pages_to_test" {
-  topic_arn = "${aws_sns_topic.pages_to_test.arn}"
-  protocol  = "lambda"
-  endpoint  = "${aws_lambda_function.worker.arn}"
-}
-
-resource "aws_sns_topic_subscription" "pages_to_test_dlq" {
-  topic_arn = "${aws_sns_topic.pages_to_test_dlq.arn}"
-  protocol  = "lambda"
-  endpoint  = "${aws_lambda_function.worker.arn}"
-}
-
-resource "aws_lambda_permission" "pages_to_test" {
-  action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.worker.function_name}"
-  principal     = "sns.amasonaws.com"
-  source_arn    = "${aws_sns_topic.pages_to_test.arn}"
-}
-
-resource "aws_lambda_permission" "pages_to_test_dlq" {
-  action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.worker.function_name}"
-  principal     = "sns.amazonaws.com"
-  source_arn    = "${aws_sns_topic.pages_to_test_dlq.arn}"
-}
-
 resource "aws_iam_role" "lambda_post_processor" {
   name               = "lambda_post_processor"
   assume_role_policy = <<EOF
@@ -462,6 +461,32 @@ resource "aws_lambda_event_source_mapping" "post_processor" {
   batch_size        = 1
 }
 
+resource "aws_sns_topic_subscription" "pages_to_test" {
+  topic_arn = "${aws_sns_topic.pages_to_test.arn}"
+  protocol  = "lambda"
+  endpoint  = "${aws_lambda_function.worker.arn}"
+}
+
+resource "aws_sns_topic_subscription" "pages_to_test_dlq" {
+  topic_arn = "${aws_sns_topic.pages_to_test_dlq.arn}"
+  protocol  = "lambda"
+  endpoint  = "${aws_lambda_function.worker.arn}"
+}
+
+resource "aws_lambda_permission" "pages_to_test" {
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.worker.function_name}"
+  principal     = "sns.amasonaws.com"
+  source_arn    = "${aws_sns_topic.pages_to_test.arn}"
+}
+
+resource "aws_lambda_permission" "pages_to_test_dlq" {
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.worker.function_name}"
+  principal     = "sns.amazonaws.com"
+  source_arn    = "${aws_sns_topic.pages_to_test_dlq.arn}"
+}
+
 resource "template_file" "invoke_lambda_function" {
   template = "${file("lighthouse-parallel.tpl")}"
 
@@ -470,31 +495,6 @@ resource "template_file" "invoke_lambda_function" {
     lambda_init_region = "${local.aws_region}"
     jobs_table_name    = "${aws_dynamodb_table.lighthouse_metrics_jobs.id}"
   }
-}
-
-# Archive file
-resource "archive_file" "lambda_init" {
-  type        = "zip"
-  source_dir  = "lambdas/src/worker"
-  output_path = "lambdas/dist/worker.zip"
-}
-
-resource "archive_file" "lambda_worker" {
-  type        = "zip"
-  source_dir  = "lambdas/src/worker"
-  output_path = "lambdas/dist/worker.zip"
-}
-
-resource "archive_file" "lambda_post_processor" {
-  type        = "zip"
-  source_dir  = "lambdas/src/post-processor"
-  output_path = "lambdas/dist/post-processor.zip"
-}
-
-resource "archive_file" "lambda_graph" {
-  type        = "zip"
-  source_dir  = "lambdas/src/graph"
-  output_path = "lambdas/dist/graph.zip"
 }
 
 resource "local_file" "invoke_lambda_function" {
