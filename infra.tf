@@ -58,7 +58,7 @@ resource "aws_dynamodb_table" "lighthouse_metrics_runs" {
     projection_type = "KEYS_ONLY"
   }
   attribute {
-    name = "RunId"
+    name = "EntryId"
     type = "S"
   }
   attribute {
@@ -136,20 +136,20 @@ resource "aws_s3_bucket_object" "lambda_graph" {
 resource "aws_iam_role" "lambda_init" {
   name               = "lambda_init"
   assume_role_policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "sts:AssumeRole",
-        "Principal": {
-          "Service": "lambda.amazonaws.com"
-        },
-        "Effect": "Allow",
-        "Sid": ""
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_iam_role_policy" "lambda_init" {
@@ -157,35 +157,35 @@ resource "aws_iam_role_policy" "lambda_init" {
   role   = "${aws_iam_role.lambda_init.id}"
 
   policy = <<EOF
-  {
-    "Verson": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "dynamodb:PutItem"
-        ],
-        "Effect": "Allow",
-        "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}"
-      },
-      {
-        "Action": [
-          "SNS:Publish"
-        ],
-        "Effect": "Allow",
-        "Resource": "${aws_sns_topic.pages_to_test.arn}"
-      },
-      {
-        "Action": [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Resource": "arn:aws:logs:*:*:*",
-        "Effect": "Allow"
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "dynamodb:PutItem"
+      ],
+      "Effect": "Allow",
+      "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}"
+    },
+    {
+      "Action": [
+        "SNS:Publish"
+      ],
+      "Effect": "Allow",
+      "Resource": "${aws_sns_topic.pages_to_test.arn}"
+    },
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*",
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_lambda_function" "init" {
@@ -210,77 +210,77 @@ resource "aws_lambda_function" "init" {
 resource "aws_iam_role" "lambda_worker" {
   name               = "lambda_worker"
   assume_role_policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "sts:AssumeRole",
-        "Principal": {
-          "Service": "lambda.amazonaws.com"
-        },
-        "Effect": "Allow",
-        "Sid": ""
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 resource "aws_iam_role_policy" "lambda_worker" {
   name   = "lambda_worker"
   role   = "${aws_iam_role.lambda_worker.id}"
 
   policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "SNS:Subscribe",
-          "SNS:Publish"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "${aws_sns_topic.pages_to_test.arn}",
-          "${aws_sns_topic.pages_to_test_dlq.arn}"
-        ]
-      },
-      {
-        "Action": [
-          "dynamodb:UpdateItem",
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:BatchGetItem"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}",
-          "${aws_dynamodb_table.lighthouse_metrics_runs.arn}"
-        ]
-      },
-      {
-        "Action": [
-          "s3:Get*",
-          "s3:List*",
-          "s3:Put*"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "${aws_s3_bucket.lighthouse_metrics.arn}",
-          "${aws_s3_bucket.lighthouse_metrics.arn}/*"
-        ]
-      },
-      {
-        "Action": [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Resource": "arn:aws:logs:*:*:*",
-        "Effect": "Allow"
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "SNS:Subscribe",
+        "SNS:Publish"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_sns_topic.pages_to_test.arn}",
+        "${aws_sns_topic.pages_to_test_dlq.arn}"
+      ]
+    },
+    {
+      "Action": [
+        "dynamodb:UpdateItem",
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}",
+        "${aws_dynamodb_table.lighthouse_metrics_runs.arn}"
+      ]
+    },
+    {
+      "Action": [
+        "s3:Get*",
+        "s3:List*",
+        "s3:Put*"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_s3_bucket.lighthouse_metrics.arn}",
+        "${aws_s3_bucket.lighthouse_metrics.arn}/*"
+      ]
+    },
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*",
+      "Effect": "Allow"
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_lambda_function" "worker" {
@@ -338,70 +338,70 @@ resource "aws_lambda_permission" "pages_to_test_dlq" {
 resource "aws_iam_role" "lambda_post_processor" {
   name               = "lambda_post_processor"
   assume_role_policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "sts:AssumeRole",
-        "Principal": {
-          "Service": "lambda.amazonaws.com"
-        },
-        "Effect": "Allow",
-        "Sid": ""
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_iam_role_policy" "lambda_post_processor" {
   name   = "lambda_post_processor"
   role   = "${aws_iam_role.lambda_post_processor.id}"
   policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "dynamodb:DescribeStream",
-          "dynamodb:GetRecordes",
-          "dynamodb:GetShardIterator",
-          "dynamodb:ListStreams"
-        ],
-        "Effect": "Allow",
-        "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.stream_arn}"
-      },
-      {
-        "Action": [
-          "dynamodb:UpdateItem"
-        ],
-        "Effect": "Allow",
-        "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}"
-      },
-      {
-        "Action": [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Effect": "Allow",
-        "Resource": "arn:aws:logs:*:*:*"
-      },
-      {
-        "Action": [
-          "s3:Get*",
-          "s3:List*",
-          "s3:Put*"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "${aws_s3_bucket.lighthouse_metrics.arn}",
-          "${aws_s3_bucket.lighthouse_metrics.arn}/*"
-        ]
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "dynamodb:DescribeStream",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:ListStreams"
+      ],
+      "Effect": "Allow",
+      "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.stream_arn}"
+    },
+    {
+      "Action": [
+        "dynamodb:UpdateItem"
+      ],
+      "Effect": "Allow",
+      "Resource": "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}"
+    },
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:logs:*:*:*"
+    },
+    {
+      "Action": [
+        "s3:Get*",
+        "s3:List*",
+        "s3:Put*"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_s3_bucket.lighthouse_metrics.arn}",
+        "${aws_s3_bucket.lighthouse_metrics.arn}/*"
+      ]
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_lambda_function" "post_processor" {
@@ -432,52 +432,52 @@ resource "aws_lambda_event_source_mapping" "post_processor" {
 resource "aws_iam_role" "lambda_graph" {
   name               = "lambda_graph"
   assume_role_policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "sts:AssumeRole",
-        "Principal": {
-          "Service": "lambda.amazonaws.com"
-        },
-        "Effect": "Allow",
-        "Sid": ""
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_iam_role_policy" "lambda_graph" {
   name   = "lambda_graph"
   role   = "${aws_iam_role.lambda_graph.id}"
   policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "dynamodb:GetItem"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "${aws_dynamodb_table.lighthouse_metrics_entries.arn}",
-          "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}",
-          "${aws_dynamodb_table.lighthouse_metrics_runs.arn}"
-        ]
-      },
-      {
-        "Action": [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Effect": "Allow",
-        "Resource": "arn:aws:logs:*:*:*"
-      }
-    ]
-  }
-  EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "dynamodb:GetItem"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_dynamodb_table.lighthouse_metrics_entries.arn}",
+        "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}",
+        "${aws_dynamodb_table.lighthouse_metrics_runs.arn}"
+      ]
+    },
+    {
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}
+EOF
 }
 
 resource "aws_lambda_function" "graph" {
