@@ -1,6 +1,7 @@
 .terraform/*
 terraform.tfstate
 terraform.tfstate.backup
+lighthouse-parallel
 lambdas/src/*/node_modules/*
 lambdas/dist/init.zip
 lambdas/dist/post-processor.zip
