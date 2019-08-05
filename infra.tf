@@ -99,6 +99,12 @@ data "archive_file" "lambda_post_processor" {
   output_path = "lambdas/dist/post-processor.zip"
 }
 
+data "archive_file" "lambda_graph" {
+  type        = "zip"
+  source_dir  = "lambdas/src/graph"
+  output_path = "lambads/dist/graph.zip"
+}
+
 resource "aws_s3_bucket_object" "lambda_init" {
   bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
   key    = "lambdas/v${local.app_version}/init.zip"
@@ -118,6 +124,13 @@ resource "aws_s3_bucket_object" "lambda_post_processor" {
   key    = "lambdas/v${local.app_version}/post-processor.zip"
   source = "${data.archive_file.lambda_post_processor.output_path}"
   etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
+}
+
+resource "aws_s3_bucket_object" "lambda_graph" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/graph.zip"
+  source = "${data.archive_file.lambda_graph.output_path}"
+  etag   = "${filemd5("lambdas/dist/graph.zip")}"
 }
 
 resource "aws_iam_role" "lambda_init" {
@@ -414,6 +427,73 @@ resource "aws_lambda_event_source_mapping" "post_processor" {
   function_name     = "${aws_lambda_function.post_processor.arn}"
   starting_position = "LATEST"
   batch_size        = 1
+}
+
+resource "aws_iam_role" "lambda_graph" {
+  name               = "lambda_graph"
+  assume_role_policy = <<EOF
+  {
+    "Version": "2012-10-17",
+    "Statemest": [
+      {
+        "Action": "sts:AssumeRole",
+        "Principal": {
+          "Service": "lambda.amazonaws.com"
+        },
+        "Effect": "Allow",
+        "Sid": ""
+      }
+    ]
+  }
+  EOF
+}
+
+resource "aws_iam_role_policy" "lambda_graph" {
+  name   = "lambda_graph"
+  role   = "${aws_iam_role.lambda_graph.id}"
+  policy = <<EOF
+  {
+    "Version": "2012-10-17",
+    "Statemest": [
+      {
+        "Action": [
+          "dynamodb:GetItem"
+        ],
+        "Effect": "Allow",
+        "Resource": [
+          "${aws_dynamodb_table.lighthouse_metrics_entries.arn}",
+          "${aws_dynamodb_table.lighthouse_metrics_jobs.arn}",
+          "${aws_dynamodb_table.lighthouse_metrics_runs.arn}"
+        ]
+      },
+      {
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Effect": "Allow",
+        "Resource": "arn:aws:logs:*:*:*"
+      }
+    ]
+  }
+  EOF
+}
+
+resource "aws_lambda_function" "graph" {
+  function_name = "lighthouse_graph"
+  s3_bucket     = "${aws_s3_bucket.lighthouse_metrics.id}"
+  s3_key        = "${aws_s3_bucket_object.lambda_graph.key}"
+  role          = "${aws_iam_role.lambda_graph.arn}"
+  handler       = "index.hanhler"
+  runtime       = "nodejs8.10"
+  memory_size   = 128
+  timeout       = 30
+  environment {
+    variables = {
+      REGION = "${local.aws_region}"
+    }
+  }
 }
 
 data "template_file" "invoke_lambda_function" {
