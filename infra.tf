@@ -416,7 +416,7 @@ resource "aws_lambda_event_source_mapping" "post_processor" {
   batch_size        = 1
 }
 
-resource "template_file" "invoke_lambda_function" {
+data "template_file" "invoke_lambda_function" {
   template = "${file("lighthouse-parallel.tpl")}"
 
   vars = {
