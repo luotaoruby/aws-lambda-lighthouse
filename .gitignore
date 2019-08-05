@@ -3,3 +3,4 @@ lambdas/src/*/node_modules/*
 lambdas/dist/init.zip
 lambdas/dist/post-processor.zip
 lambdas/dist/worker.zip
+lambdas/dist/graph.zip
