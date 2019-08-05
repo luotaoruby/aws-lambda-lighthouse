@@ -454,7 +454,7 @@ resource "aws_iam_role_policy" "lambda_graph" {
   policy = <<EOF
   {
     "Version": "2012-10-17",
-    "Statemest": [
+    "Statement": [
       {
         "Action": [
           "dynamodb:GetItem"
