@@ -80,56 +80,6 @@ resource "aws_sns_topic" "pages_to_test_dlq" {
   name = "lighthouse-pages-to-test-dlq"
 }
 
-# Archive file
-resource "archive_file" "lambda_init" {
-  type        = "zip"
-  source_dir  = "lambdas/src/worker"
-  output_path = "lambdas/dist/worker.zip"
-}
-
-resource "archive_file" "lambda_worker" {
-  type        = "zip"
-  source_dir  = "lambdas/src/worker"
-  output_path = "lambdas/dist/worker.zip"
-}
-
-resource "archive_file" "lambda_post_processor" {
-  type        = "zip"
-  source_dir  = "lambdas/src/post-processor"
-  output_path = "lambdas/dist/post-processor.zip"
-}
-
-resource "archive_file" "lambda_graph" {
-  type        = "zip"
-  source_dir  = "lambdas/src/graph"
-  output_path = "lambdas/dist/graph.zip"
-}
-
-resource "aws_s3_bucket_object" "lambda_init" {
-  bucket = "${aws_s3_bucket.lightouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/init.zip"
-  source = "${data.archive_file.lambda_init.output_path}"
-  etag   = "${filemd5("lambdas/dist/init.zip")}"
-}
-
-resource "aws_s3_bucket_object" "lambda_worker" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/worker.zip"
-  source = "${data.archive_file.lambda_worker.output_path}"
-  etag   = "${filemd5("lambdas/dist/worker.zip")}"
-}
-resource "aws_s3_bucket_object" "lambda_post_processor" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambdas/v${local.app_version}/post-processor.zip"
-  source = "${data.archive_file.lambda_post_processor.output_path}"
-  etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
-}
-resource "aws_s3_bucket_object" "lambda_graph" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambads/v${local.app_version}/graph.zip"
-  source = "${data.archive_file.lambda_graph.output_path}"
-  etag   = "${filemd5("lambdas/dist/graph.zip")}"
-}
 
 resource "aws_iam_role" "lambda_graph" {
   name               = "lambda_graph"
@@ -282,7 +232,7 @@ resource "aws_iam_role" "lambda_worker" {
   }
   EOF
 }
-resource "aws_iam_role_policy" "lambda_worke" {
+resource "aws_iam_role_policy" "lambda_worker" {
   name   = "lambda_worker"
   role   = "${aws_iam_role.lambda_worker.id}"
 
@@ -364,6 +314,32 @@ resource "aws_lambda_function" "worker" {
       DLQ_ARN         = "${aws_sns_topic.pages_to_test_dlq.arn}"
     }
   }
+}
+
+resource "aws_s3_bucket_object" "lambda_init" {
+  bucket = "${aws_s3_bucket.lightouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/init.zip"
+  source = "${data.archive_file.lambda_init.output_path}"
+  etag   = "${filemd5("lambdas/dist/init.zip")}"
+}
+
+resource "aws_s3_bucket_object" "lambda_worker" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/worker.zip"
+  source = "${data.archive_file.lambda_worker.output_path}"
+  etag   = "${filemd5("lambdas/dist/worker.zip")}"
+}
+resource "aws_s3_bucket_object" "lambda_post_processor" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambdas/v${local.app_version}/post-processor.zip"
+  source = "${data.archive_file.lambda_post_processor.output_path}"
+  etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
+}
+resource "aws_s3_bucket_object" "lambda_graph" {
+  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
+  key    = "lambads/v${local.app_version}/graph.zip"
+  source = "${data.archive_file.lambda_graph.output_path}"
+  etag   = "${filemd5("lambdas/dist/graph.zip")}"
 }
 
 resource "aws_sns_topic_subscription" "pages_to_test" {
@@ -494,6 +470,31 @@ resource "template_file" "invoke_lambda_function" {
     lambda_init_region = "${local.aws_region}"
     jobs_table_name    = "${aws_dynamodb_table.lighthouse_metrics_jobs.id}"
   }
+}
+
+# Archive file
+resource "archive_file" "lambda_init" {
+  type        = "zip"
+  source_dir  = "lambdas/src/worker"
+  output_path = "lambdas/dist/worker.zip"
+}
+
+resource "archive_file" "lambda_worker" {
+  type        = "zip"
+  source_dir  = "lambdas/src/worker"
+  output_path = "lambdas/dist/worker.zip"
+}
+
+resource "archive_file" "lambda_post_processor" {
+  type        = "zip"
+  source_dir  = "lambdas/src/post-processor"
+  output_path = "lambdas/dist/post-processor.zip"
+}
+
+resource "archive_file" "lambda_graph" {
+  type        = "zip"
+  source_dir  = "lambdas/src/graph"
+  output_path = "lambdas/dist/graph.zip"
 }
 
 resource "local_file" "invoke_lambda_function" {
