@@ -81,28 +81,22 @@ resource "aws_sns_topic" "pages_to_test_dlq" {
 }
 
 # Archive file
-resource "archive_file" "lambda_init" {
+data "archive_file" "lambda_init" {
   type        = "zip"
   source_dir  = "lambdas/src/init"
   output_path = "lambdas/dist/init.zip"
 }
 
-resource "archive_file" "lambda_worker" {
+data "archive_file" "lambda_worker" {
   type        = "zip"
   source_dir  = "lambdas/src/worker"
   output_path = "lambdas/dist/worker.zip"
 }
 
-resource "archive_file" "lambda_post_processor" {
+data "archive_file" "lambda_post_processor" {
   type        = "zip"
   source_dir  = "lambdas/src/post-processor"
   output_path = "lambdas/dist/post-processor.zip"
-}
-
-resource "archive_file" "lambda_graph" {
-  type        = "zip"
-  source_dir  = "lambdas/src/graph"
-  output_path = "lambdas/dist/graph.zip"
 }
 
 resource "aws_s3_bucket_object" "lambda_init" {
@@ -118,77 +112,12 @@ resource "aws_s3_bucket_object" "lambda_worker" {
   source = "${data.archive_file.lambda_worker.output_path}"
   etag   = "${filemd5("lambdas/dist/worker.zip")}"
 }
+
 resource "aws_s3_bucket_object" "lambda_post_processor" {
   bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
   key    = "lambdas/v${local.app_version}/post-processor.zip"
   source = "${data.archive_file.lambda_post_processor.output_path}"
   etag   = "${filemd5("lambdas/dist/post-processor.zip")}"
-}
-resource "aws_s3_bucket_object" "lambda_graph" {
-  bucket = "${aws_s3_bucket.lighthouse_metrics.id}"
-  key    = "lambads/v${local.app_version}/graph.zip"
-  source = "${data.archive_file.lambda_graph.output_path}"
-  etag   = "${filemd5("lambdas/dist/graph.zip")}"
-}
-
-resource "aws_iam_role" "lambda_graph" {
-  name               = "lambda_graph"
-  assume_role_policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "sts:AssumeRole",
-        "Principal": {
-          "Service": "lambda.amazonaws.com"
-        },
-        "Effect": "Allow",
-        "Sid": ""
-      }
-    ]
-  }
-  EOF
-}
-
-resource "aws_iam_role_policy" "lambda_graph" {
-  name   = "lambda_graph"
-  role   = "${aws_iam_role.lambda_graph.id}"
-  policy = <<EOF
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Effect": "Allow",
-        "Resource": "arn:aws:logs:*:*:*"
-      }
-    ]
-  }
-  EOF
-}
-
-resource "aws_lambda_function" "graph" {
-  function_name = "lighthouse_graph"
-  s3_bucket     = "${aws_s3_bucket.lighthouse_metrics.id}"
-  s3_key        = "${aws_s3_bucket_object.lambda_graph.key}"
-  role          = "${aws_iam_role.lambda_graph.arn}"
-  handler       = "index.handler"
-  runtime       = "nodejs8.10"
-  memory_size   = 128
-
-  environment {
-    variables = {
-      ENTRIES_TABLE_NAME = "${aws_dynamodb_table.lighthouse_metrics_entries.id}"
-      JOBS_TABLE_NAME    = "${aws_dynamodb_table.lighthouse_metrics_jobs.id}"
-      RUNS_TABLE_NAME    = "${aws_dynamodb_table.lighthouse_metrics_runs.id}"
-      REGION             = "${local.aws_region}"
-      BUCKET             = "${aws_s3_bucket.lighthouse_metrics.id}"
-    }
-  }
 }
 
 resource "aws_iam_role" "lambda_init" {
@@ -349,7 +278,7 @@ resource "aws_lambda_function" "worker" {
   handler                        = "index.handler"
   runtime                        = "nodejs8.10"
   memory_size                    = "${local.lambda_worker_memory}"
-  timeout                        = "${local.lamda_worker_timeout}"
+  timeout                        = "${local.lambda_worker_timeout}"
   reserved_concurrent_executions = "3"
 
   dead_letter_config {
@@ -365,6 +294,32 @@ resource "aws_lambda_function" "worker" {
       DLQ_ARN         = "${aws_sns_topic.pages_to_test_dlq.arn}"
     }
   }
+}
+
+resource "aws_sns_topic_subscription" "pages_to_test" {
+  topic_arn = "${aws_sns_topic.pages_to_test.arn}"
+  protocol  = "lambda"
+  endpoint  = "${aws_lambda_function.worker.arn}"
+}
+
+resource "aws_sns_topic_subscription" "pages_to_test_dlq" {
+  topic_arn = "${aws_sns_topic.pages_to_test_dlq.arn}"
+  protocol  = "lambda"
+  endpoint  = "${aws_lambda_function.worker.arn}"
+}
+
+resource "aws_lambda_permission" "pages_to_test" {
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.worker.function_name}"
+  principal     = "sns.amazonaws.com"
+  source_arn    = "${aws_sns_topic.pages_to_test.arn}"
+}
+
+resource "aws_lambda_permission" "pages_to_test_dlq" {
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.worker.function_name}"
+  principal     = "sns.amazonaws.com"
+  source_arn    = "${aws_sns_topic.pages_to_test_dlq.arn}"
 }
 
 resource "aws_iam_role" "lambda_post_processor" {
@@ -459,32 +414,6 @@ resource "aws_lambda_event_source_mapping" "post_processor" {
   function_name     = "${aws_lambda_function.post_processor.arn}"
   starting_position = "LATEST"
   batch_size        = 1
-}
-
-resource "aws_sns_topic_subscription" "pages_to_test" {
-  topic_arn = "${aws_sns_topic.pages_to_test.arn}"
-  protocol  = "lambda"
-  endpoint  = "${aws_lambda_function.worker.arn}"
-}
-
-resource "aws_sns_topic_subscription" "pages_to_test_dlq" {
-  topic_arn = "${aws_sns_topic.pages_to_test_dlq.arn}"
-  protocol  = "lambda"
-  endpoint  = "${aws_lambda_function.worker.arn}"
-}
-
-resource "aws_lambda_permission" "pages_to_test" {
-  action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.worker.function_name}"
-  principal     = "sns.amasonaws.com"
-  source_arn    = "${aws_sns_topic.pages_to_test.arn}"
-}
-
-resource "aws_lambda_permission" "pages_to_test_dlq" {
-  action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.worker.function_name}"
-  principal     = "sns.amazonaws.com"
-  source_arn    = "${aws_sns_topic.pages_to_test_dlq.arn}"
 }
 
 resource "template_file" "invoke_lambda_function" {
