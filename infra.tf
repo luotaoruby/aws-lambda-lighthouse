@@ -212,7 +212,7 @@ resource "aws_iam_role" "lambda_worker" {
   assume_role_policy = <<EOF
   {
     "Version": "2012-10-17",
-    "Statemest": [
+    "Statement": [
       {
         "Action": "sts:AssumeRole",
         "Principal": {
@@ -434,7 +434,7 @@ resource "aws_iam_role" "lambda_graph" {
   assume_role_policy = <<EOF
   {
     "Version": "2012-10-17",
-    "Statemest": [
+    "Statement": [
       {
         "Action": "sts:AssumeRole",
         "Principal": {

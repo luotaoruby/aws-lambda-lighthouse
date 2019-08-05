@@ -1,4 +1,6 @@
 .terraform/*
+terraform.tfstate
+terraform.tfstate.backup
 lambdas/src/*/node_modules/*
 lambdas/dist/init.zip
 lambdas/dist/post-processor.zip
