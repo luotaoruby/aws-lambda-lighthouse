@@ -1,5 +1,13 @@
 # aws-lambda-lighthouse
 
+## Requirements
+
+- AWS Account
+- AWS access credentials
+- nodejs 8.10
+- terraform v0.12.3
+- yarn
+
 ## Deploy
 
 - `touch lambdas/dist/init.zip lambdas/dist/post-processor.zip lambdas/dist/worker.zip lambdas/dist/graph.zip`.
